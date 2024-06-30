@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdint.h>
+
 /**
  * main - function starts the http
  * server
@@ -20,11 +22,11 @@ int main() {
     }
 #endif
     int server_socket;
-    int client_socket;
     int server_sock_bind;
     int listener;
     int new_socket;
     int sender;
+    int *client_socket = malloc(sizeof(int));
 
     struct sockaddr_in server_address; 
     struct sockaddr_in client_address;
@@ -61,14 +63,25 @@ int main() {
 
     for (;;) {
         client_address_len = sizeof(client_address);
-        client_socket = accept(server_socket, (struct sockaddr *)&client_address, &client_address_len);
-        if (client_socket < 0) {
+        if (!client_socket) {
+            perror("not able to allocate memory\n");
+            printf("failed to allocate memory");
+            continue;
+        }
+
+        *client_socket = accept(server_socket, (struct sockaddr *)&client_address, &client_address_len);
+        if (*client_socket < 0) {
             printf("Error accepting connection");
+            free(client_socket);
             shutdown(server_socket, 2);
             exit(EXIT_FAILURE);
         }
-        
-        client_process(client_socket);
+        // For windows
+        uintptr_t thread = _beginthread(multi_client, 0, client_socket);
+        if (thread == 0) {
+            printf("failed to create a thread\n");
+            free(client_socket);
+        }
     }
 
 #ifdef _WIN32

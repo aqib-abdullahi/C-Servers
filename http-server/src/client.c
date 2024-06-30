@@ -49,19 +49,15 @@ void client_process(int client_socket) {
     response_body = "Hello world!\n";
 
     int response_length = strlen(response_header) + strlen(response_body);
-    char *response = (char *)malloc(response_length + 1);
-    if (response == NULL) {
-        perror("Failed to allocate memory for response");
-    } else {
-        strcpy(response, response_header);
-        strcat(response, response_body);
+    char *response;
+    strcpy(response, response_header);
+    strcat(response, response_body);
 
-        sender = send(client_socket, response, response_length, 0);
-        if (sender < 0) {
-            perror("Socket error");
-        }
-    // return;
+    sender = send(client_socket, response, response_length, 0);
+    if (sender < 0) {
+        perror("Socket error");
     }
+
     #ifdef _WIN32            
     shutdown(client_socket, 2);
     #else
