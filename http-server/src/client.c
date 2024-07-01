@@ -38,22 +38,45 @@ void client_process(int client_socket) {
         printf("Bytes read (on buffer): %d.\nBuffer: %s", read_bytes, buffer);
     }
     
-    const char* response_header;
-    response_header = 
+    char method[16], path[256];
+    sscanf(buffer, "%15s %255s", method, path);
+
+    printf("Method: %s\n", method);
+    printf("Path: %s\n", path);
+
+    char content[BUFFER_MAX];
+    const char* response;
+    response = 
             "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/plain\r\n"
-            "Content-Length: 12\r\n"
-            "\r\n";
+            "Content-Type: text/html\r\n"
+            "Content-Length: %d\r\n"
+            "\r\n%s";
+    
+    char complete_response[BUFFER_MAX];
 
-    const char* response_body;
-    response_body = "Hello world!\n";
+    if (strcmp(method, "GET") == 0) {
+        if (strcmp(path, "/") == 0) {
+            snprintf(content, BUFFER_MAX, 
+                            "<html><body><h1>Hello world</h1></body></html>");
+        } else
+        {
+            snprintf(content, BUFFER_MAX,
+                            "<html><body><h1>Resource not found</h1></body></html>");
+        }
+    } else {
+        response = 
+            "HTTP/1.1 405 Method Not Allowed\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: %d\r\n"
+            "\r\n%s";
+        
+        snprintf(content, BUFFER_MAX, 
+                            "<html><body><h1>Method Not Allowed</h1></body></html>");
+    }
 
-    int response_length = strlen(response_header) + strlen(response_body);
-    char *response;
-    strcpy(response, response_header);
-    strcat(response, response_body);
+    snprintf(complete_response, BUFFER_MAX, response, strlen(content), content);
 
-    sender = send(client_socket, response, response_length, 0);
+    sender = send(client_socket, complete_response, strlen(complete_response), 0);
     if (sender < 0) {
         perror("Socket error");
     }

@@ -73,8 +73,7 @@ int main() {
         if (*client_socket < 0) {
             printf("Error accepting connection");
             free(client_socket);
-            shutdown(server_socket, 2);
-            exit(EXIT_FAILURE);
+            continue;
         }
         // For windows
         uintptr_t thread = _beginthread(multi_client, 0, client_socket);
