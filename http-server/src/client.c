@@ -2,41 +2,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <shlwapi.h>
 
 /**
- * client - handles client side process
+ * client_process - handles client side process
+ * @client_socket - file description
  * return: nothing
  */
 
 
 void client_process(int client_socket) {
     int sender;
-    int read_bytes;
+    ssize_t read_bytes;
     char buffer[BUFFER_MAX];
 
-    memset(buffer, 0, BUFFER_MAX);
-
-    #ifdef _WIN32
+    printf("\n started client process\n");
     read_bytes = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
-    #else
-    read_bytes = read(client_socket, buffer, sizeof(buffer) - 1);
-    #endif
-
+    printf("size of read bytes buffer: %d\n", read_bytes);
     if (read_bytes < 0) {
-        printf("error reading request\n");
+        perror("Error reading request.\n");
         #ifdef _WIN32
         shutdown(client_socket, 2);
         #else
         close(client_socket);
         #endif
         return;
-    } else if (read_bytes == 0) {
-        printf("client close connection\n");
-    } else {
-        buffer[read_bytes] = '\0';
-        printf("read_bytes: %d\n", read_bytes);
-        printf("Bytes read (on buffer): %d.\nBuffer: %s", read_bytes, buffer);
     }
+
+    buffer[read_bytes] = '\0';
     
     char method[16], path[256];
     sscanf(buffer, "%15s %255s", method, path);
@@ -44,41 +38,45 @@ void client_process(int client_socket) {
     printf("Method: %s\n", method);
     printf("Path: %s\n", path);
 
-    char content[BUFFER_MAX];
-    const char* response;
-    response = 
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Content-Length: %d\r\n"
-            "\r\n%s";
-    
-    char complete_response[BUFFER_MAX];
-
+    char* response_file = NULL;
+    char* complete_response = NULL;
     if (strcmp(method, "GET") == 0) {
         if (strcmp(path, "/") == 0) {
-            snprintf(content, BUFFER_MAX, 
-                            "<html><body><h1>Hello world</h1></body></html>");
-        } else
-        {
-            snprintf(content, BUFFER_MAX,
-                            "<html><body><h1>Resource not found</h1></body></html>");
-        }
+            response_file = static_file("./hello.html");
+            const char *response_ok_template = "HTTP/1.1 200 OK\r\n"
+                                       "Content-Type: text/html\r\n"
+                                       "Content-Length: %d\r\n"
+                                       "\r\n%s";
+            if (response_file) {
+                ssize_t response_file_size = snprintf(NULL, 0, response_ok_template, (int)strlen(response_file), response_file) + 1;
+                complete_response = malloc(response_file_size);
+                snprintf(complete_response, response_file_size, response_ok_template, (int)strlen(response_file), response_file);
+            } else {
+                const char *hello_world = "<html><body><h1>Hello world</h1></body></html>";
+                snprintf(complete_response,  strlen(response_ok_template) + strlen(hello_world), response_ok_template, (int)strlen(hello_world), hello_world);
+            }
+        } else {
+            const char *response_not_found_template = "HTTP/1.1 404 Not Found\r\n"
+                                              "Content-Type: text/html\r\n"
+                                              "Content-Length: 53\r\n"
+                                              "\r\n<html><body><h1>Resource not found</h1></body></html>";
+            complete_response = strdup(response_not_found_template);
+        }    
     } else {
-        response = 
-            "HTTP/1.1 405 Method Not Allowed\r\n"
-            "Content-Type: text/html\r\n"
-            "Content-Length: %d\r\n"
-            "\r\n%s";
-        
-        snprintf(content, BUFFER_MAX, 
-                            "<html><body><h1>Method Not Allowed</h1></body></html>");
+        const char *response_not_allowed_template = "HTTP/1.1 405 Method Not Allowed\r\n"
+                                       "Content-Type: text/html\r\n"
+                                       "Content-Length: 51\r\n"
+                                       "\r\n<html><body><h1>Method Not Allowed</h1></body></html>";
+        complete_response = strdup(response_not_allowed_template);
     }
 
-    snprintf(complete_response, BUFFER_MAX, response, strlen(content), content);
+    if (complete_response) {
+        sender = send(client_socket, complete_response, strlen(complete_response), 0);
+        free(complete_response);
+    }
 
-    sender = send(client_socket, complete_response, strlen(complete_response), 0);
-    if (sender < 0) {
-        perror("Socket error");
+    if (response_file) {
+        free(response_file);
     }
 
     #ifdef _WIN32            

@@ -24,9 +24,11 @@ int main() {
     int server_socket;
     int server_sock_bind;
     int listener;
-    int new_socket;
-    int sender;
-    int *client_socket = malloc(sizeof(int));
+    #ifdef _WIN32
+    char opt = 1;
+    #else
+    int opt = 1;
+    #endif
 
     struct sockaddr_in server_address; 
     struct sockaddr_in client_address;
@@ -38,6 +40,12 @@ int main() {
         exit(EXIT_FAILURE);
     }
     printf("socket created successfully\n");
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt))) {
+        perror("Set socket options error");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
+
 
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(PORT);
@@ -56,16 +64,15 @@ int main() {
         printf("Error listenin to incoming connection\n");
         shutdown(server_socket, 2);
         exit(EXIT_FAILURE);
-    } else
-    {
-        printf("server listening on port %d\n", PORT);
     }
+    printf("server listening on port %d\n", PORT);
 
     for (;;) {
         client_address_len = sizeof(client_address);
+        int *client_socket = malloc(sizeof(int));
         if (!client_socket) {
             perror("not able to allocate memory\n");
-            printf("failed to allocate memory");
+            // printf("failed to allocate memory");
             continue;
         }
 
@@ -76,18 +83,28 @@ int main() {
             continue;
         }
         // For windows
+        #ifdef _WIN32
         uintptr_t thread = _beginthread(multi_client, 0, client_socket);
+        printf("\nbegin thread\n");
         if (thread == 0) {
             printf("failed to create a thread\n");
             free(client_socket);
         }
+        #else
+        pthread_t thread;
+        if (pthread_create(&thread, NULL, (void *)multi_client, client_socket) != 0) {
+            perror("Thread creation error");
+            free(client_socket);
+        }
+        pthread_detach(thread);
+        #endif
     }
 
-#ifdef _WIN32
+    #ifdef _WIN32
     WSACleanup();
-#else
+    #else
     close(server_socket);
-#endif
+    #endif
 
     return 0;
 };

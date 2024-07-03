@@ -3,7 +3,8 @@
 /**
  * multi_client - function handles multiple client
  * processes at once
- * return: void pointer
+ * @arg: pointer to client socket
+ * return: void
  */
 
 

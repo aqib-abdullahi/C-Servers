@@ -11,7 +11,8 @@
 #endif
 
 #define PORT 8080
-#define BUFFER_MAX 1024
+#define BUFFER_MAX 4096
 
 void client_process(int client_socket);
 void multi_client(void* arg);
+char* static_file(const char* file_path);
